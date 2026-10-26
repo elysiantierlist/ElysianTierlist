@@ -322,16 +322,60 @@ const ROLES=[
    {id:'idea',t:'area',max:1200,it:'Cosa miglioreresti in Elysian Tierlist?',en:'What would you improve in Elysian Tierlist?'},
    {id:'avail',t:'text',max:100,req:1,it:'Disponibilità settimanale',en:'Weekly availability'}
   ]},
- {id:'t18',ico:'⚔️',tag:'1.8',
-  it:{n:'Verified Tester 1.8',d:'Testa i giocatori nelle modalità della 1.8.'},
-  en:{n:'Verified Tester 1.8',d:'Test players in the 1.8 gamemodes.'},
+ {id:'t17',ico:'⚔️',tag:'1.7',
+  it:{n:'Verified Tester 1.7',d:'Testa i giocatori nelle modalità della 1.7.'},
+  en:{n:'Verified Tester 1.7',d:'Test players in the 1.7 gamemodes.'},
   q:[
-   {t:'sec',it:'Domande Tester 1.8',en:'Tester 1.8 questions'},
-   {id:'tier',t:'text',max:60,req:1,it:'Il tuo tier attuale (1.8)',en:'Your current tier (1.8)'},
-   {id:'modes',t:'text',max:200,req:1,it:'Modalità che sai testare bene',en:'Gamemodes you can test well'},
-   {id:'exp',t:'area',max:1200,req:1,it:'Esperienza come tester o nelle tierlist',en:'Tester / tierlist experience'},
-   {id:'proof',t:'url',max:250,it:'Link a clip o prove (YouTube, Medal…)',en:'Link to clips or proof (YouTube, Medal…)'},
-   {id:'avail',t:'text',max:100,req:1,it:'Ore disponibili',en:'Available hours'}
+   {t:'sec',it:'Sezione 1: Motivazione e modalità',en:'Section 1: Motivation and gamemode'},
+   {id:'q3',n:3,t:'area',max:1500,req:1,it:'Perché vorresti diventare un Verified-Tester per questa tier list?',en:'Why would you like to become a Verified Tester for this tier list?'},
+   {id:'q4',n:4,t:'radio',two:1,req:1,it:'Quale modalità principale desideri testare?',en:'Which main gamemode do you want to test?',
+     o:['Bedfight','Block Fight','Bedwars','Boxing','Sumo','No-Debuff','UHC 1.7+','Topfight','Battlerush','Pearlfight','Bridge','Spleef','Fireball-fight','Classic','Build UHC','Emerald Rush']},
+   {id:'q5',n:5,t:'radio',two:1,req:1,it:'Qual è attualmente il tuo tier personale nella modalità scelta sopra?',en:'What is your current personal tier in the gamemode chosen above?',
+     o:['B+','A-','A','A+','S-','S','S+']},
+
+   {t:'sec',it:'Sezione 2: Conoscenza della Modalità e Meccaniche PvP 1.7+ (Domande 6-12)',en:'Section 2: Gamemode Knowledge and 1.7+ PvP Mechanics (Questions 6-12)'},
+   {id:'q6',n:6,t:'area',max:2000,req:1,it:'Descrivi la modalità che hai scelto nella domanda 4 durante lo svolgimento di un tier test ufficiale.',en:'Describe the gamemode you chose in question 4 as it is run during an official tier test.',
+     hi:{it:'Risposta aperta. Spiega come si svolge concretamente il test, le fasi principali e cosa osservi attentamente.',en:'Open answer. Explain how the test is actually carried out, the main phases and what you pay close attention to.'}},
+   {id:'q7',n:7,t:'area',max:1500,req:1,it:'Quali sono le regole fondamentali e i divieti principali validi durante i test della modalità scelta?',en:'What are the fundamental rules and main prohibitions during tests of the chosen gamemode?'},
+   {id:'q8',n:8,t:'area',max:2000,req:1,it:'Spiega nel dettaglio le principali tecniche e meccaniche di combattimento utilizzate in questa modalità (es. blockhit, w-tap, s-tap, aim, spacing, click methods).',en:'Explain in detail the main combat techniques and mechanics used in this gamemode (e.g. blockhit, w-tap, s-tap, aim, spacing, click methods).'},
+   {id:'q9',n:9,t:'area',max:1500,req:1,it:'Come si differenzia la gestione del combattimento e del ritmo di gioco nella versione 1.7+ rispetto ad altre versioni?',en:'How does combat handling and game rhythm in version 1.7+ differ from other versions?'},
+   {id:'q10',n:10,t:'area',max:1500,req:1,it:'Durante un test noti che un giocatore sta eseguendo movimenti o colpi anomali (es. portata o velocità sospetta). Qual è la procedura tecnica corretta da seguire?',en:'During a test you notice a player performing abnormal movements or hits (e.g. suspicious reach or speed). What is the correct technical procedure to follow?'},
+   {id:'q11',n:11,t:'area',max:1500,req:1,it:'Quali sono i criteri di valutazione personali e oggettivi che adotti per decidere se un player merita un tier superiore o inferiore nella tua modalità?',en:'What personal and objective evaluation criteria do you use to decide whether a player deserves a higher or lower tier in your gamemode?'},
+   {id:'q12',n:12,t:'area',max:1500,req:1,it:'Un giocatore sostiene di aver perso il test unicamente a causa del ping o di un leggero lag. Come analizzi la situazione senza farti condizionare?',en:'A player claims they lost the test solely because of ping or slight lag. How do you analyze the situation without being swayed?'},
+
+   {t:'sec',it:'Sezione 3: Imparzialità, Gestione dei Test e Scenari (Domande 13-22)',en:'Section 3: Impartiality, Test Management and Scenarios (Questions 13-22)'},
+   {id:'q13',n:13,t:'radio',req:1,it:'Un tester è amico stretto di uno dei due contendenti in un test importante. Come va gestita la situazione per garantire assoluta trasparenza?',
+     en:'A tester is a close friend of one of the two contenders in an important test. How should the situation be handled to guarantee absolute transparency?',
+     o:{it:['Lasciare fare al tester amico tanto è affidabile','Sostituire immediatamente il tester con un altro membro dello staff neutrale','Far decidere ai giocatori se accettare il tester','Annullare definitivamente la richiesta di test'],
+        en:['Let the friend tester proceed, he is reliable anyway','Immediately replace the tester with another neutral staff member','Let the players decide whether to accept the tester','Permanently cancel the test request']},
+     x:{it:'Motiva brevemente la risposta.',en:'Briefly explain your answer.'}},
+   {id:'q14',n:14,t:'area',max:1500,req:1,it:'Due giocatori contestano il risultato di un test pubblicato e forniscono versioni completamente opposte dei fatti. Quale azione intraprendi per prima?',en:'Two players dispute the result of a published test and give completely opposite versions of the facts. What action do you take first?'},
+   {id:'q15',n:15,t:'area',max:1500,req:1,it:'Un player molto noto e influente nella community ti scrive in privato chiedendoti di alzarlo di tier "di favore", promettendo sponsorizzazioni. Come reagisci?',en:'A very well-known and influential player in the community messages you privately asking you to raise their tier "as a favor", promising sponsorships. How do you react?'},
+   {id:'q16',n:16,t:'area',max:1500,req:1,it:'Come applichi concretamente il principio dell\'imparzialità quando devi valutare un giocatore con cui hai avuto discussioni o antipatie in passato?',en:'How do you concretely apply the principle of impartiality when you must evaluate a player you have had arguments or dislike with in the past?'},
+   {id:'q17',n:17,t:'area',max:1500,req:1,it:'Un utente minaccia di diffondere screenshot manipolati dei canali staff riservati (NDA) se non gli viene assegnato il tier S+. Come procedi?',en:'A user threatens to spread manipulated screenshots of the reserved staff channels (NDA) unless they are given tier S+. How do you proceed?'},
+   {id:'q18',n:18,t:'area',max:1500,req:1,it:'Noti che un collega tester sta palesemente favorendo i propri amici durante i test di gruppo. Qual è il comportamento corretto da parte tua?',en:'You notice that a fellow tester is blatantly favoring their own friends during group tests. What is the correct behavior on your part?'},
+   {id:'q19',n:19,t:'area',max:3000,w:100,req:1,it:'Durante un test nasce una forte discussione con insulti tra i due partecipanti. Descrivi in ordine cronologico tutte le tue azioni per sedare la situazione.',en:'During a test a heated argument with insults breaks out between the two participants. Describe in chronological order all your actions to calm the situation.',
+     hi:{it:'Risposta aperta (minimo 100 parole).',en:'Open answer (minimum 100 words).'}},
+   {id:'q20',n:20,t:'area',max:1500,req:1,it:'Un giocatore insiste nel voler rigiocare un test perso perché "non era concentrato". Come gestisci la richiesta nel rispetto del regolamento?',en:'A player insists on replaying a lost test because "they were not focused". How do you handle the request in line with the rules?'},
+   {id:'q21',n:21,t:'area',max:1500,req:1,it:'Come definisci il concetto di NDA (Non-Disclosure Agreement) applicato ai canali riservati dello staff e perché la segretezza è vitale?',en:'How do you define the concept of NDA (Non-Disclosure Agreement) applied to reserved staff channels, and why is secrecy vital?'},
+   {id:'q22',n:22,t:'area',max:1500,req:1,it:'Un utente richiede informazioni dettagliate sui criteri interni di voto discussi nei canali segreti dello staff. Cosa gli rispondi?',en:'A user asks for detailed information about the internal voting criteria discussed in the secret staff channels. What do you answer?'},
+
+   {t:'sec',it:'Sezione 5: Regolamento e Casi Finali (Domande 27-30)',en:'Section 5: Rules and Final Cases (Questions 27-30)'},
+   {id:'q27',n:27,t:'area',max:1500,req:1,it:'Quale comportamento è severamente vietato riguardo ai dati personali o alle informazioni sensibili degli utenti all\'interno della community?',en:'Which behavior is strictly forbidden regarding users\' personal data or sensitive information within the community?'},
+   {id:'q28',n:28,t:'radio',req:1,it:'Se un utente viola palesemente le linee guida globali di Discord all\'interno del server, oltre a sanzionarlo internamente, cosa bisogna fare?',
+     en:'If a user clearly violates Discord\'s global guidelines within the server, besides sanctioning them internally, what must be done?',
+     o:{it:['Ignorare la cosa perché riguarda solo Discord','Segnalare direttamente la violazione agli strumenti di supporto/trust & safety di Discord','Chiedere scusa all\'utente','Pubblicare i suoi dati in chat pubblica'],
+        en:['Ignore it because it only concerns Discord','Report the violation directly to Discord\'s support / trust & safety tools','Apologize to the user','Publish their data in public chat']},
+     x:{it:'Motiva la risposta.',en:'Explain your answer.'}},
+   {id:'q29',n:29,t:'area',max:1500,req:1,it:'Un membro dello staff ti chiede di rivelargli il voto espresso da un altro tester in segreto. Come ti comporti?',en:'A staff member asks you to reveal the vote another tester cast in secret. How do you behave?'},
+   {t:'sec',it:'Conferme finali',en:'Final confirmations'},
+   {id:'confirm',n:30,t:'conf',req:1,it:'Conferme finali',en:'Final confirmations',items:[
+     {it:'Ho almeno 14 anni e rispetto i requisiti di età di Discord.',en:'I am at least 14 years old and meet Discord\'s age requirements.'},
+     {it:'Conosco perfettamente l\'italiano e possiedo un livello di inglese almeno A2/B1.',en:'I know Italian perfectly and have an English level of at least A2/B1.'},
+     {it:'Possiedo una conoscenza approfondita del PvP 1.7+ e della modalità scelta.',en:'I have in-depth knowledge of 1.7+ PvP and of the chosen gamemode.'},
+     {it:'Accetto di mantenere la totale segretezza dei canali riservati (NDA).',en:'I agree to keep the reserved channels completely confidential (NDA).'},
+     {it:'Confermo di essere imparziale e di aver risposto in modo sincero e personale.',en:'I confirm that I am impartial and that I answered honestly and personally.'}
+   ]}
   ]},
  {id:'t19',ico:'🗡️',tag:'1.9+',
   it:{n:'Verified Tester 1.9+',d:'Testa i giocatori nelle modalità della 1.9+.'},
@@ -387,7 +431,7 @@ function fieldHTML(f){
   if(f.hi)h+=`<div class="hint">${f.hi[L]}</div>`;
   if(f.t==='area')h+=`<textarea id="f_${f.id}" maxlength="${f.max}"></textarea><div class="cnt" id="wc_${f.id}"></div>`;
   else if(f.t==='radio'){
-    h+=`<div class="opts">${optsOf(f,L).map((o,i)=>`<label class="opt"><input type="radio" name="r_${f.id}" value="${i}"><span>${o}</span></label>`).join('')}</div>`+xHTML(f);
+    h+=`<div class="opts${f.two?' two':''}">${optsOf(f,L).map((o,i)=>`<label class="opt"><input type="radio" name="r_${f.id}" value="${i}"><span>${o}</span></label>`).join('')}</div>`+xHTML(f);
   }else if(f.t==='check'){
     h+=`<div class="opts two">${optsOf(f,L).map((o,i)=>`<label class="opt"><input type="checkbox" name="c_${f.id}" value="${i}"><span>${o}</span></label>`).join('')}</div>`;
     if(f.otherIdx!=null)h+=`<div class="other" id="ow_${f.id}" hidden><input type="text" id="o_${f.id}" maxlength="60" placeholder="${UI[L].other}"></div>`;
