@@ -9,7 +9,7 @@
 // in automatico i webhook che trova scritti nei repository pubblici di GitHub.
 // NON e' una protezione: chi apre il sito puo' comunque ricavarlo.
 // ============================================================
-window.ELYSIAN_WEBHOOK_B64 = "INSERISCI-QUI-IL-WEBHOOK-CODIFICATO";
+window.ELYSIAN_WEBHOOK_B64 = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTU2NDczNTE4MTc1ODI3NTU4Ny9yTDVTTzhUemxhSHJlYkNBNFRYeTNnRWZxa0RGSkxuMGdQYXhrcDRzRUpXc0xpZDNaSDZHQzAtM25xS2xrdW4wbjZOUw==";
 
 // (Opzionale) Se un giorno vuoi usare il Worker Cloudflare, metti qui il suo indirizzo.
 // Se e' compilato, il sito usa quello e ignora il webhook sopra.
