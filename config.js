@@ -11,6 +11,10 @@
 // ============================================================
 window.ELYSIAN_WEBHOOK_B64 = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTU2NDczNTE4MTc1ODI3NTU4Ny9yTDVTTzhUemxhSHJlYkNBNFRYeTNnRWZxa0RGSkxuMGdQYXhrcDRzRUpXc0xpZDNaSDZHQzAtM25xS2xrdW4wbjZOUw==";
 
+// Canale di tipo FORUM: true (ogni candidatura diventa un post).
+// Se un giorno usi un canale di testo normale, cambialo in false.
+window.ELYSIAN_FORUM = true;
+
 // (Opzionale) Se un giorno vuoi usare il Worker Cloudflare, metti qui il suo indirizzo.
 // Se e' compilato, il sito usa quello e ignora il webhook sopra.
 window.ELYSIAN_WORKER_URL = "";
