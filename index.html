@@ -204,6 +204,7 @@ const UI={
    net:'Errore di invio. Riprova tra poco.',wait:'Hai già inviato una candidatura da poco. Riprova più tardi.',
    doneT:'Candidatura inviata!',doneP:'Il nostro staff la leggerà il prima possibile. Controlla i tuoi DM su Discord: ti contatteremo lì.',again:'Nuova candidatura',
    words:'parole',lang:'Italiano 🇮🇹',unavailable:'Il sistema di invio non è ancora configurato.',
+   badHook:'Il link del webhook in config.js non è valido: ricontrolla di averlo codificato in Base64 per intero.',
    confirm:'Confermo',noconfirm:'Non confermo',other:'Specifica quale…',
    draft:'💾 Le tue risposte vengono salvate automaticamente su questo dispositivo, puoi chiudere e riprendere più tardi.'},
  en:{title:'Applications',sub:'Minecraft · 1.7.10 – 1.21',pick:'What do you want to apply for?',back:'← Back',
@@ -214,6 +215,7 @@ const UI={
    net:'Could not send. Please try again soon.',wait:'You already sent an application recently. Try again later.',
    doneT:'Application sent!',doneP:'Our staff will review it as soon as possible. Keep your Discord DMs open: we will contact you there.',again:'New application',
    words:'words',lang:'English 🇬🇧',unavailable:'The submission system is not configured yet.',
+   badHook:'The webhook link in config.js is not valid: check that you Base64-encoded the whole link.',
    confirm:'I confirm',noconfirm:'I do not confirm',other:'Specify which…',
    draft:'💾 Your answers are saved automatically on this device, you can close the page and continue later.'}
 };
@@ -637,13 +639,16 @@ $('again').onclick=()=>show('scr-role');
 const DC_COLORS={supporter:0xc084fc,ss:0x60a5fa,dev:0x4ade80,t17:0xfb923c,t19:0xf472b6};
 const DC_NAMES={supporter:'Supporter',ss:'SS Verified',dev:'Developer',t17:'Verified Tester 1.7',t19:'Verified Tester 1.9+'};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let hookWhy='';
 function getHook(){
-  try{
-    const raw=(window.ELYSIAN_WEBHOOK_B64||'').trim();
-    if(!raw||raw.includes('INSERISCI'))return '';
-    const url=atob(raw);
-    return /^https:\/\/(?:[a-z]+\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/i.test(url)?url:'';
-  }catch(_){return ''}
+  hookWhy='';
+  const raw=String(window.ELYSIAN_WEBHOOK_B64==null?'':window.ELYSIAN_WEBHOOK_B64).replace(/\s+/g,'');
+  if(!raw||raw.includes('INSERISCI')){hookWhy='missing';return ''}
+  let url='';
+  try{url=atob(raw.replace(/-/g,'+').replace(/_/g,'/'))}catch(_){hookWhy='bad';return ''}
+  const m=url.match(/https:\/\/(?:[a-z]+\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+/i);
+  if(!m){hookWhy='bad';return ''}
+  return m[0];
 }
 const dcClean=(x,n)=>String(x==null?'':x).replace(/@/g,'@​').slice(0,n);
 function dcChunk(t,n){
@@ -651,15 +656,19 @@ function dcChunk(t,n){
   while(t.length>n){let c=t.lastIndexOf(' ',n);if(c<n*0.6)c=n;out.push(t.slice(0,c));t=t.slice(c).trimStart()}
   out.push(t);return out;
 }
-async function dcPost(url,body){
+async function dcPost(url,body,thread){
+  const target=url+'?wait=true'+(thread?'&thread_id='+thread:'');
   for(let t=0;t<3;t++){
-    const r=await fetch(url+'?wait=true',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r=await fetch(target,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(r.status===429){const j=await r.json().catch(()=>({}));await sleep(Math.min((j.retry_after||1)*1000,5000));continue}
-    return r.ok;
+    if(r.ok)return await r.json().catch(()=>({}));
+    const j=await r.json().catch(()=>({}));window.dcErr=r.status+(j.message?' – '+j.message:'');
+    return false;
   }
   return false;
 }
 async function sendToDiscord(url,d){
+  window.dcErr='';
   const get=id=>(d.fields.find(f=>f.id===id)||{}).a||'';
   const did=String(get('discord_id')).trim(),duser=dcClean(get('discord'),60),ign=dcClean(get('ign'),40);
   const lang=d.lang==='en'?'🇬🇧 English':'🇮🇹 Italiano';
@@ -676,6 +685,7 @@ async function sendToDiscord(url,d){
   }
   if(cur.length)groups.push(cur);
   const mention=/^\d{17,20}$/.test(did)?`<@${did}>`:'n/d';
+  const forum=window.ELYSIAN_FORUM===true;let thread='';
   for(let i=0;i<groups.length;i++){
     const e={color:DC_COLORS[d.role],fields:groups[i],footer:{text:`Elysian Tierlist · Candidature · ${i+1}/${groups.length}`}};
     if(i===0){
@@ -683,7 +693,11 @@ async function sendToDiscord(url,d){
       e.description=`**Utente:** ${mention}  (${duser||'n/d'})\n**IGN:** ${ign||'n/d'}\n**Lingua:** ${lang}`;
       e.timestamp=new Date().toISOString();
     }else e.title=`↳ ${DC_NAMES[d.role]} · ${ign||'candidato'} · parte ${i+1}/${groups.length}`;
-    if(!await dcPost(url,{username:'Elysian Candidature',allowed_mentions:{parse:[]},embeds:[e]}))return false;
+    const body={username:'Elysian Candidature',allowed_mentions:{parse:[]},embeds:[e]};
+    if(forum&&!thread)body.thread_name=`${DC_NAMES[d.role]} · ${ign||'candidato'}`.slice(0,100);
+    const res=await dcPost(url,body,thread);
+    if(!res)return false;
+    if(forum&&!thread&&res.channel_id)thread=res.channel_id;
     if(i<groups.length-1)await sleep(700);
   }
   return true;
@@ -699,7 +713,7 @@ $('form').addEventListener('submit',async e=>{
   let last=0;try{last=+localStorage.getItem('ely_last')||0}catch(_){}
   if(Date.now()-last<5*60*1000){m.textContent=u.wait;m.className='msg err';return}
   const hook=getHook(),worker=(window.ELYSIAN_WORKER_URL||'').startsWith('http')?window.ELYSIAN_WORKER_URL:'';
-  if(!hook&&!worker){m.textContent=u.unavailable;m.className='msg err';return}
+  if(!hook&&!worker){m.textContent=hookWhy==='bad'?u.badHook:u.unavailable;m.className='msg err';return}
   const payload={role:R.id,roleName:R.en.n,lang:L,fields:res.fields};
   const btn=$('send');btn.disabled=true;btn.textContent=u.sending;
   try{
@@ -711,7 +725,7 @@ $('form').addEventListener('submit',async e=>{
     }
     try{localStorage.setItem('ely_last',Date.now());localStorage.removeItem(dk())}catch(_){}
     $('fields').innerHTML='';FIELDS=[];show('scr-done');
-  }catch(_){m.textContent=u.net;m.className='msg err'}
+  }catch(err){m.textContent=u.net+(err instanceof TypeError?' (rete/CORS)':window.dcErr?` (Discord ${window.dcErr})`:'');m.className='msg err'}
   btn.disabled=false;btn.textContent=u.send;
 });
 
