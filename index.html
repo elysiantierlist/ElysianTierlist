@@ -633,6 +633,62 @@ $('back1').onclick=()=>show('scr-lang');
 $('back2').onclick=()=>show('scr-role');
 $('again').onclick=()=>show('scr-role');
 
+/* ---------- invio diretto a Discord (stessa logica del Worker) ---------- */
+const DC_COLORS={supporter:0xc084fc,ss:0x60a5fa,dev:0x4ade80,t17:0xfb923c,t19:0xf472b6};
+const DC_NAMES={supporter:'Supporter',ss:'SS Verified',dev:'Developer',t17:'Verified Tester 1.7',t19:'Verified Tester 1.9+'};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function getHook(){
+  try{
+    const raw=(window.ELYSIAN_WEBHOOK_B64||'').trim();
+    if(!raw||raw.includes('INSERISCI'))return '';
+    const url=atob(raw);
+    return /^https:\/\/(?:[a-z]+\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/i.test(url)?url:'';
+  }catch(_){return ''}
+}
+const dcClean=(x,n)=>String(x==null?'':x).replace(/@/g,'@​').slice(0,n);
+function dcChunk(t,n){
+  const out=[];
+  while(t.length>n){let c=t.lastIndexOf(' ',n);if(c<n*0.6)c=n;out.push(t.slice(0,c));t=t.slice(c).trimStart()}
+  out.push(t);return out;
+}
+async function dcPost(url,body){
+  for(let t=0;t<3;t++){
+    const r=await fetch(url+'?wait=true',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.status===429){const j=await r.json().catch(()=>({}));await sleep(Math.min((j.retry_after||1)*1000,5000));continue}
+    return r.ok;
+  }
+  return false;
+}
+async function sendToDiscord(url,d){
+  const get=id=>(d.fields.find(f=>f.id===id)||{}).a||'';
+  const did=String(get('discord_id')).trim(),duser=dcClean(get('discord'),60),ign=dcClean(get('ign'),40);
+  const lang=d.lang==='en'?'🇬🇧 English':'🇮🇹 Italiano';
+  const flat=[];
+  for(const f of d.fields){
+    const q=dcClean(f.q,240)||'-';
+    dcChunk(dcClean(f.a,4000).trim()||'-',1000).forEach((p,i)=>flat.push({name:i?'↳ (continua)':q,value:p,inline:false}));
+  }
+  const groups=[];let cur=[],size=0;
+  for(const fl of flat){
+    const n=fl.name.length+fl.value.length;
+    if(cur.length>=24||size+n>4800){groups.push(cur);cur=[];size=0}
+    cur.push(fl);size+=n;
+  }
+  if(cur.length)groups.push(cur);
+  const mention=/^\d{17,20}$/.test(did)?`<@${did}>`:'n/d';
+  for(let i=0;i<groups.length;i++){
+    const e={color:DC_COLORS[d.role],fields:groups[i],footer:{text:`Elysian Tierlist · Candidature · ${i+1}/${groups.length}`}};
+    if(i===0){
+      e.title=`📨 Nuova candidatura: ${DC_NAMES[d.role]}`;
+      e.description=`**Utente:** ${mention}  (${duser||'n/d'})\n**IGN:** ${ign||'n/d'}\n**Lingua:** ${lang}`;
+      e.timestamp=new Date().toISOString();
+    }else e.title=`↳ ${DC_NAMES[d.role]} · ${ign||'candidato'} · parte ${i+1}/${groups.length}`;
+    if(!await dcPost(url,{username:'Elysian Candidature',allowed_mentions:{parse:[]},embeds:[e]}))return false;
+    if(i<groups.length-1)await sleep(700);
+  }
+  return true;
+}
+
 $('form').addEventListener('submit',async e=>{
   e.preventDefault();const u=UI[L],m=$('msg');m.className='msg';
   const f=$('form');
@@ -642,12 +698,17 @@ $('form').addEventListener('submit',async e=>{
   if(res.err){m.textContent=res.err;m.className='msg err';return}
   let last=0;try{last=+localStorage.getItem('ely_last')||0}catch(_){}
   if(Date.now()-last<5*60*1000){m.textContent=u.wait;m.className='msg err';return}
-  if(!window.ELYSIAN_WORKER_URL||window.ELYSIAN_WORKER_URL.includes('INSERISCI')){m.textContent=u.unavailable;m.className='msg err';return}
+  const hook=getHook(),worker=(window.ELYSIAN_WORKER_URL||'').startsWith('http')?window.ELYSIAN_WORKER_URL:'';
+  if(!hook&&!worker){m.textContent=u.unavailable;m.className='msg err';return}
   const payload={role:R.id,roleName:R.en.n,lang:L,fields:res.fields};
   const btn=$('send');btn.disabled=true;btn.textContent=u.sending;
   try{
-    const r=await fetch(window.ELYSIAN_WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(!r.ok)throw 0;
+    if(worker){
+      const r=await fetch(worker,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(!r.ok)throw 0;
+    }else{
+      if(!await sendToDiscord(hook,payload))throw 0;
+    }
     try{localStorage.setItem('ely_last',Date.now());localStorage.removeItem(dk())}catch(_){}
     $('fields').innerHTML='';FIELDS=[];show('scr-done');
   }catch(_){m.textContent=u.net;m.className='msg err'}
