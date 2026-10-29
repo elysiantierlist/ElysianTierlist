@@ -1,1 +1,307 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidati | Elysian Tierlist</title>
+<meta name="theme-color" content="#1a0b3a">
+<link rel="icon" href="../logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="nav"></div>
+<main class="wrap" id="app"><div class="loading">Caricamento…</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../site-config.js"></script>
+<script src="../config.js"></script>
+<script src="../assets/forms-default.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+(async function () {
+  await ELY.init({ nav: 'apply' });
+  const esc = ELY.esc, $ = (id) => document.getElementById(id);
+  const forms = await ELY.loadForms();
 
+  /* ---------- testi interfaccia ---------- */
+  const UI = {
+    it: {
+      sub: 'Minecraft · 1.7.10 – 1.21', pick: 'Per cosa vuoi candidarti?', back: '← Indietro', form: 'Compila la candidatura',
+      send: 'Invia candidatura ✨', sending: 'Invio in corso…', req: 'Compila tutti i campi obbligatori: ho evidenziato quello che manca.',
+      minAge: 'Devi avere almeno 14 anni per candidarti.', minVal: (n) => `Il valore minimo è ${n}.`, badUrl: 'Inserisci un link valido che inizi con https://',
+      minWords: (n) => `Questa risposta deve avere almeno ${n} parole.`, net: 'Errore di invio. Riprova tra poco.',
+      dup: 'Hai già una candidatura in attesa per questo ruolo. Puoi seguirla da "Le mie candidature".', rate: 'Hai inviato troppe candidature nelle ultime 24 ore. Riprova più tardi.',
+      doneT: 'Candidatura inviata!', doneP: 'Lo staff la leggerà il prima possibile. Puoi seguire lo stato da "Le mie candidature" e tieni aperti i DM di Discord: ti contatteremo lì.',
+      mine: 'Le mie candidature', again: 'Nuova candidatura', words: 'parole', lang: 'Italiano 🇮🇹', confirm: 'Confermo', noconfirm: 'Non confermo', other: 'Specifica quale…',
+      draft: '💾 Le tue risposte vengono salvate automaticamente su questo dispositivo: puoi chiudere e riprendere più tardi.',
+      chooseLang: 'Scegli la lingua · Choose your language', as: 'Stai candidandoti come', pendingTag: '⏳ Già inviata (in attesa)',
+      none: 'Al momento non ci sono candidature aperte.', loginT: 'Accedi per candidarti', loginP: 'Serve un account Discord: così lo staff sa chi sei e tu puoi seguire lo stato della candidatura.',
+      loginB: 'Accedi con Discord', noCfg: 'Il sito non è ancora collegato al database (vedi GUIDA-STAFF.md).'
+    },
+    en: {
+      sub: 'Minecraft · 1.7.10 – 1.21', pick: 'What do you want to apply for?', back: '← Back', form: 'Fill in your application',
+      send: 'Submit application ✨', sending: 'Sending…', req: 'Please fill in all required fields: the missing one is highlighted.',
+      minAge: 'You must be at least 14 years old to apply.', minVal: (n) => `The minimum value is ${n}.`, badUrl: 'Enter a valid link starting with https://',
+      minWords: (n) => `This answer must be at least ${n} words long.`, net: 'Could not send. Please try again soon.',
+      dup: 'You already have a pending application for this role. You can follow it in "My applications".', rate: 'You sent too many applications in the last 24 hours. Try again later.',
+      doneT: 'Application sent!', doneP: 'Our staff will review it as soon as possible. You can follow its status in "My applications"; keep your Discord DMs open, we will contact you there.',
+      mine: 'My applications', again: 'New application', words: 'words', lang: 'English 🇬🇧', confirm: 'I confirm', noconfirm: 'I do not confirm', other: 'Specify which…',
+      draft: '💾 Your answers are saved automatically on this device: you can close the page and continue later.',
+      chooseLang: 'Scegli la lingua · Choose your language', as: 'Applying as', pendingTag: '⏳ Already sent (pending)',
+      none: 'There are no open applications right now.', loginT: 'Log in to apply', loginP: 'A Discord account is required, so the staff knows who you are and you can follow your application.',
+      loginB: 'Log in with Discord', noCfg: 'The site is not connected to the database yet (see GUIDA-STAFF.md).'
+    }
+  };
+
+  if (!ELY.configured) { ELY.setMain(`<div class="panel center screen"><h2>Candidature</h2><p class="muted">${esc(UI.it.noCfg)}</p></div>`); return; }
+  if (!ELY.user || !ELY.profile) {
+    ELY.setMain(`<div class="panel center screen" style="max-width:520px;margin:30px auto"><h2>${UI.it.loginT}</h2><p class="muted" style="margin-bottom:18px">${UI.it.loginP}</p><button class="btn discord" id="go">${UI.it.loginB}</button></div>`);
+    $('go').onclick = () => ELY.login(location.href);
+    return;
+  }
+
+  /* ---------- stato ---------- */
+  let L = 'it'; try { L = localStorage.getItem('ely_lang') || 'it'; } catch (_) { }
+  if (L !== 'it' && L !== 'en') L = 'it';
+  let R = null, FIELDS = [];
+  const pending = {};
+  { const { data } = await ELY.sb.from('applications').select('role,status').eq('user_id', ELY.user.id); (data || []).forEach((a) => { if (a.status === 'pending') pending[a.role] = true; }); }
+
+  ELY.setMain(`<div class="screen">
+    <div class="center"><h1 class="page-title">Candidature</h1><p class="page-sub" id="t-sub"></p><div class="steps"><i class="on" id="s1"></i><i id="s2"></i><i id="s3"></i></div></div>
+    <section class="screen" id="scr-lang"><h2 class="panel-title" id="t-lang"></h2>
+      <div class="grid lang-grid">
+        <button class="card" data-lang="it"><div class="flag">🇮🇹</div><h3>Italiano</h3><p>Candidati in italiano</p></button>
+        <button class="card" data-lang="en"><div class="flag">🇬🇧</div><h3>English</h3><p>Apply in English</p></button>
+      </div></section>
+    <section class="screen" id="scr-role" hidden><div class="bar"><button class="btn ghost" id="back1"></button><span class="chip" id="chip-lang"></span></div>
+      <h2 class="panel-title" id="t-pick"></h2><div class="grid" id="roles"></div></section>
+    <section class="screen" id="scr-form" hidden><div class="bar"><button class="btn ghost" id="back2"></button><span class="chip" id="chip-role"></span></div>
+      <h2 class="panel-title" id="t-form"></h2>
+      <form class="app" id="form" novalidate>
+        <div class="row-flex" id="whoami" style="margin-bottom:12px"></div>
+        <div class="draftnote" id="draftnote"></div>
+        <div id="fields"></div>
+        <div style="text-align:center;margin-top:10px"><button class="btn" id="send" type="submit"></button></div>
+        <div class="msg" id="msg"></div>
+      </form></section>
+    <section class="screen" id="scr-done" hidden><div class="done"><div class="big">🏆</div><h2 id="d-title"></h2><p id="d-text"></p>
+      <div class="row-flex" style="justify-content:center"><a class="btn" id="d-mine"></a><button class="btn ghost" id="again"></button></div></div></section>
+  </div>`);
+
+  const show = (id) => {
+    ['scr-lang', 'scr-role', 'scr-form', 'scr-done'].forEach((s) => { $(s).hidden = s !== id; });
+    const n = { 'scr-lang': 1, 'scr-role': 2, 'scr-form': 3, 'scr-done': 3 }[id];
+    ['s1', 's2', 's3'].forEach((s, i) => $(s).classList.toggle('on', i < n)); scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  /* ---------- helpers testo ---------- */
+  const lab = (o) => (o ? (o[L] != null && o[L] !== '' ? o[L] : o.it || '') : '');
+  const optsOf = (f, l) => (Array.isArray(f.o) ? f.o : ((f.o && (f.o[l] || f.o.it)) || []));
+  const sidOf = (f) => String(f.id).replace(/[^A-Za-z0-9_]/g, '_');
+
+  function applyLang() {
+    const u = UI[L]; document.documentElement.lang = L;
+    $('t-sub').textContent = u.sub; $('t-lang').textContent = u.chooseLang; $('t-pick').textContent = u.pick;
+    $('back1').textContent = u.back; $('back2').textContent = u.back; $('t-form').textContent = u.form;
+    $('send').textContent = u.send; $('chip-lang').textContent = u.lang; $('draftnote').textContent = u.draft;
+    $('d-title').textContent = u.doneT; $('d-text').textContent = u.doneP; $('again').textContent = u.again;
+    $('d-mine').textContent = u.mine; $('d-mine').href = ELY.url('account/');
+    const box = $('roles'); box.innerHTML = '';
+    if (!forms.roles.length) box.innerHTML = `<div class="empty">${esc(u.none)}</div>`;
+    forms.roles.forEach((r) => {
+      const isP = !!pending[r.id];
+      const b = document.createElement(isP ? 'a' : 'button'); b.className = 'card'; if (!isP) b.type = 'button'; else b.href = ELY.url('account/');
+      b.innerHTML = `<div class="ico">${esc(r.ico || '⭐')}</div><h3>${esc((r[L] && r[L].n) || (r.it && r.it.n) || r.id)}</h3><p>${esc((r[L] && r[L].d) || (r.it && r.it.d) || '')}</p>
+        ${isP ? `<span class="tag">${esc(u.pendingTag)}</span>` : (r.tag ? `<span class="tag">${esc(r.tag)}</span>` : '')}`;
+      if (!isP) b.onclick = () => openRole(r);
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- rendering dei campi ---------- */
+  function labelHTML(f, forId) {
+    const num = f._n ? `<span class="num">${f._n}</span>` : '';
+    const star = f.req ? ' <span class="req">*</span>' : '';
+    const t = esc(lab(f));
+    return forId ? `<label class="lab" for="${forId}">${num}${t}${star}</label>` : `<div class="lab">${num}${t}${star}</div>`;
+  }
+  function xHTML(f) {
+    if (!f.x) return '';
+    return `<div class="xwrap" id="xw_${f.sid}" ${f.showIf ? 'hidden' : ''}><label class="sublab" for="x_${f.sid}">${esc(lab(f.x))} <span class="req">*</span></label>
+      <textarea id="x_${f.sid}" maxlength="1500" style="min-height:90px"></textarea></div>`;
+  }
+  function fieldHTML(f) {
+    if (f.t === 'sec') return `<h3 class="sec">${esc(lab(f))}</h3>`;
+    let h = `<div class="f" id="w_${f.sid}">`;
+    if (f.t !== 'conf') h += labelHTML(f, (f.t === 'radio' || f.t === 'check') ? null : 'f_' + f.sid);
+    else h += labelHTML(Object.assign({}, f, { req: 1 }), null);
+    if (f.hi) h += `<div class="hint">${esc(lab(f.hi))}</div>`;
+    if (f.t === 'area') h += `<textarea id="f_${f.sid}" maxlength="${+f.max || 2000}"></textarea><div class="cnt" id="wc_${f.sid}"></div>`;
+    else if (f.t === 'radio') {
+      h += `<div class="opts${f.two ? ' two' : ''}">${optsOf(f, L).map((o, i) => `<label class="opt"><input type="radio" name="r_${f.sid}" value="${i}"><span>${esc(o)}</span></label>`).join('')}</div>` + xHTML(f);
+    } else if (f.t === 'check') {
+      h += `<div class="opts two">${optsOf(f, L).map((o, i) => `<label class="opt"><input type="checkbox" name="c_${f.sid}" value="${i}"><span>${esc(o)}</span></label>`).join('')}</div>`;
+      if (f.otherIdx != null) h += `<div class="other" id="ow_${f.sid}" hidden><input type="text" id="o_${f.sid}" maxlength="60" placeholder="${esc(UI[L].other)}"></div>`;
+      h += xHTML(f);
+    } else if (f.t === 'conf') {
+      h += `<div class="conf">${(f.items || []).map((it, i) => `<div class="crow"><div class="ctext">${esc(lab(it))}</div><div class="cbtn">
+        <label class="opt"><input type="radio" name="k_${f.sid}_${i}" value="1"><span>${esc(UI[L].confirm)}</span></label>
+        <label class="opt"><input type="radio" name="k_${f.sid}_${i}" value="0"><span>${esc(UI[L].noconfirm)}</span></label></div></div>`).join('')}</div>`;
+    } else {
+      const type = f.t === 'number' ? 'number' : f.t === 'url' ? 'url' : 'text';
+      h += `<input id="f_${f.sid}" type="${type}" ${f.t === 'number' ? `inputmode="numeric" min="${+f.min || 0}" max="${+f.max || 99}"` : `maxlength="${+f.max || 100}"`} ${f.t === 'url' ? 'placeholder="https://"' : ''} autocomplete="off">`;
+    }
+    return h + '</div>';
+  }
+
+  function refresh() {
+    FIELDS.forEach((f) => {
+      if (f.t === 'radio' && f.x && f.showIf) {
+        const c = document.querySelector(`input[name="r_${f.sid}"]:checked`);
+        $('xw_' + f.sid).hidden = !(c && f.showIf.includes(+c.value));
+      }
+      if (f.t === 'check' && f.otherIdx != null) {
+        const c = document.querySelector(`input[name="c_${f.sid}"][value="${f.otherIdx}"]`);
+        if (c) $('ow_' + f.sid).hidden = !c.checked;
+      }
+      if (f.t === 'area') {
+        const el = $('f_' + f.sid), n = ELY.words(el.value), w = +f.w || 0, c = $('wc_' + f.sid);
+        c.textContent = w ? `${n}/${w} ${UI[L].words}` : `${el.value.length}/${+f.max || 2000}`;
+        c.classList.toggle('ok', !!w && n >= w);
+      }
+    });
+  }
+
+  /* ---------- bozza automatica ---------- */
+  const dk = () => `ely_draft_${ELY.user.id}_${R.id}_${L}`;
+  function snap() {
+    const o = {};
+    document.querySelectorAll('#fields input,#fields textarea').forEach((el) => {
+      if (el.type === 'radio') { if (el.checked) o[el.name] = el.value; }
+      else if (el.type === 'checkbox') { if (el.checked) (o[el.name] = o[el.name] || []).push(el.value); }
+      else if (el.id) o[el.id] = el.value;
+    });
+    return o;
+  }
+  function restore() {
+    let o = null; try { o = JSON.parse(localStorage.getItem(dk()) || 'null'); } catch (_) { }
+    if (!o) return;
+    document.querySelectorAll('#fields input,#fields textarea').forEach((el) => {
+      if (el.type === 'radio') el.checked = (o[el.name] === el.value);
+      else if (el.type === 'checkbox') el.checked = Array.isArray(o[el.name]) && o[el.name].includes(el.value);
+      else if (el.id && o[el.id] !== undefined) el.value = o[el.id];
+    });
+  }
+  let dt; const saveDraft = () => { clearTimeout(dt); dt = setTimeout(() => { try { localStorage.setItem(dk(), JSON.stringify(snap())); } catch (_) { } }, 400); };
+
+  function buildForm() {
+    const common = forms.common.q.map((q) => Object.assign({}, q));
+    const own = ELY.numberize(R.q || []);
+    const seen = {}; FIELDS = [];
+    common.concat(own).forEach((q, i) => {
+      const f = Object.assign({}, q); f.sid = sidOf(f) + (seen[sidOf(f)] ? '_' + i : ''); seen[sidOf(f)] = 1; FIELDS.push(f);
+    });
+    $('fields').innerHTML = FIELDS.map(fieldHTML).join('');
+    $('msg').className = 'msg';
+    $('chip-role').textContent = (R.ico || '⭐') + ' ' + ((R[L] && R[L].n) || (R.it && R.it.n) || R.id);
+    $('whoami').innerHTML = `<span class="muted small">${esc(UI[L].as)}</span> <span class="row-flex" style="gap:8px">${ELY.avatar(ELY.profile.avatar_url, ELY.profile.username, 'sm')}<b>${esc(ELY.profile.username)}</b><span class="muted small">ID ${esc(ELY.profile.discord_id || '')}</span></span>`;
+    restore(); refresh();
+  }
+  function openRole(r) { R = r; buildForm(); show('scr-form'); }
+
+  $('fields').addEventListener('input', (e) => { const w = e.target.closest('.f'); if (w) w.classList.remove('bad'); refresh(); saveDraft(); });
+  $('fields').addEventListener('change', (e) => { const w = e.target.closest('.f'); if (w) w.classList.remove('bad'); refresh(); saveDraft(); });
+
+  /* ---------- lettura + controllo risposte (domande sempre in italiano per lo staff) ---------- */
+  function collect() {
+    const u = UI[L], out = [];
+    const bad = (f, msg) => { const w = $('w_' + f.sid); if (w) { w.classList.add('bad'); w.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return { err: msg || u.req }; };
+    for (const f of FIELDS) {
+      if (f.t === 'sec') continue;
+      const q = (f._n ? f._n + '. ' : '') + (f.it || f.en || ''); let a = '';
+      if (f.t === 'text' || f.t === 'url') {
+        const v = $('f_' + f.sid).value.trim();
+        if (f.req && !v) return bad(f);
+        if (f.t === 'url' && v && !/^https?:\/\/\S+$/i.test(v)) return bad(f, u.badUrl);
+        a = v || '—';
+      } else if (f.t === 'number') {
+        const v = $('f_' + f.sid).value.trim();
+        if (!v) { if (f.req) return bad(f); a = '—'; }
+        else { if (f.min && +v < +f.min) return bad(f, f.id === 'age' ? u.minAge : u.minVal(f.min)); a = String(+v); }
+      } else if (f.t === 'area') {
+        const v = $('f_' + f.sid).value.trim(), need = +f.w || 1;
+        if (f.req && ELY.words(v) < need) return bad(f, need > 1 ? u.minWords(need) : u.req);
+        a = v || '—';
+      } else if (f.t === 'radio') {
+        const c = document.querySelector(`input[name="r_${f.sid}"]:checked`);
+        if (!c) { if (f.req) return bad(f); a = '—'; }
+        else {
+          const idx = +c.value; a = optsOf(f, 'it')[idx] || optsOf(f, L)[idx] || '';
+          if (f.x && (!f.showIf || f.showIf.includes(idx))) { const tx = $('x_' + f.sid).value.trim(); if (!tx) return bad(f); a += `\n→ ${tx}`; }
+        }
+      } else if (f.t === 'check') {
+        const cs = [...document.querySelectorAll(`input[name="c_${f.sid}"]:checked`)].map((c) => +c.value);
+        if (!cs.length) { if (f.req) return bad(f); a = '—'; }
+        else {
+          const it = optsOf(f, 'it').length ? optsOf(f, 'it') : optsOf(f, L);
+          a = cs.map((i) => { if (i === f.otherIdx) { const o = $('o_' + f.sid).value.trim(); return o ? `${it[i]}: ${o}` : it[i]; } return it[i]; }).join(', ');
+          if (f.x) { const tx = $('x_' + f.sid).value.trim(); if (!tx) return bad(f); a += `\n${f.xPre || '→'}: ${tx}`; }
+        }
+      } else if (f.t === 'conf') {
+        const lines = [];
+        for (let i = 0; i < (f.items || []).length; i++) {
+          const c = document.querySelector(`input[name="k_${f.sid}_${i}"]:checked`);
+          if (!c) return bad(f);
+          lines.push(`${c.value === '1' ? '✅' : '❌'} ${f.items[i].it || f.items[i].en}`);
+        }
+        a = lines.join('\n');
+      }
+      out.push({ id: f.id, q: q || f.id, a });
+    }
+    return { answers: out };
+  }
+
+  /* ---------- eventi ---------- */
+  document.querySelectorAll('[data-lang]').forEach((b) => { b.onclick = () => { L = b.dataset.lang; try { localStorage.setItem('ely_lang', L); } catch (_) { } applyLang(); show('scr-role'); }; });
+  $('back1').onclick = () => show('scr-lang');
+  $('back2').onclick = () => show('scr-role');
+  $('again').onclick = () => { applyLang(); show('scr-role'); };
+
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault(); const u = UI[L], m = $('msg'); m.className = 'msg';
+    document.querySelectorAll('.f.bad').forEach((x) => x.classList.remove('bad'));
+    const res = collect();
+    if (res.err) { m.textContent = res.err; m.className = 'msg err'; return; }
+    const btn = $('send'); btn.disabled = true; btn.textContent = u.sending;
+    try {
+      const { data, error } = await ELY.sb.from('applications').insert({ user_id: ELY.user.id, role: R.id, lang: L, answers: res.answers }).select('id').single();
+      if (error) {
+        const msg = String(error.message || '');
+        m.textContent = error.code === '23505' ? u.dup : /rate limit/i.test(msg) ? u.rate : `${u.net} (${msg})`; m.className = 'msg err';
+      } else {
+        pending[R.id] = true; try { localStorage.removeItem(dk()); } catch (_) { }
+        const ign = (res.answers.find((x) => x.id === 'ign') || {}).a || '';
+        await ELY.postToDiscord({
+          role: R.id, roleName: (R.it && R.it.n) || R.id, lang: L, ign, username: ELY.profile.username, discordId: ELY.profile.discord_id,
+          appUrl: ELY.url('staff/application/?id=' + encodeURIComponent(data.id)),
+          fields: [{ q: 'ID Discord', a: ELY.profile.discord_id || '' }, { q: 'Username Discord', a: ELY.profile.username || '' }].concat(res.answers)
+        });
+        $('fields').innerHTML = ''; FIELDS = []; show('scr-done');
+      }
+    } catch (err) { m.textContent = `${u.net} (${err && err.message ? err.message : ''})`; m.className = 'msg err'; }
+    btn.disabled = false; btn.textContent = u.send;
+  });
+
+  applyLang();
+  const wanted = new URLSearchParams(location.search).get('role');
+  const wr = wanted && forms.roles.find((r) => r.id === wanted);
+  if (wr && !pending[wr.id]) { try { if (localStorage.getItem('ely_lang')) { openRole(wr); return; } } catch (_) { } }
+  show('scr-lang');
+})();
+</script>
+</body>
+</html>
