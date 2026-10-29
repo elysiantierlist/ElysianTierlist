@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Candidatura | Area staff | Elysian Tierlist</title>
+<meta name="theme-color" content="#1a0b3a">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../../logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="nav"></div>
+<main class="wrap wide" id="app"><div class="loading">Caricamento…</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../../site-config.js"></script>
+<script src="../../config.js"></script>
+<script src="../../assets/forms-default.js"></script>
+<script src="../../assets/app.js"></script>
+<script>
+(async function () {
+  if (!(await ELY.init({ nav: 'staff', require: 'staff' }))) return;
+  const esc = ELY.esc, sb = ELY.sb, me = ELY.user.id;
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { ELY.panelMsg('Candidatura non trovata', 'Manca l\'indirizzo della candidatura.'); return; }
+  await ELY.loadForms();
+
+  let app = null, cand = null, profs = {}, votes = [], notes = [], others = [];
+
+  async function load() {
+    const a = await sb.from('applications').select('*').eq('id', id).maybeSingle();
+    if (a.error) { ELY.panelMsg('Errore', esc(a.error.message)); return false; }
+    if (!a.data) { ELY.panelMsg('Candidatura non trovata', 'Non esiste o è stata cancellata.'); return false; }
+    app = a.data;
+    const [p, v, n, o] = await Promise.all([
+      sb.from('profiles').select('*'),
+      sb.from('application_votes').select('*').eq('application_id', id),
+      sb.from('application_notes').select('*').eq('application_id', id).order('created_at', { ascending: true }),
+      sb.from('applications').select('id,role,status,created_at').eq('user_id', app.user_id).order('created_at', { ascending: false })
+    ]);
+    const err = p.error || v.error || n.error || o.error;
+    if (err) { ELY.panelMsg('Errore', esc(err.message)); return false; }
+    profs = {}; (p.data || []).forEach((x) => { profs[x.id] = x; });
+    cand = profs[app.user_id] || {}; votes = v.data || []; notes = n.data || []; others = (o.data || []).filter((x) => x.id !== id);
+    return true;
+  }
+  const name = (uid) => (profs[uid] && profs[uid].username) || 'staff';
+
+  function draw() {
+    const myVote = (votes.find((v) => v.staff_id === me) || {}).vote;
+    const cnt = { yes: 0, no: 0, abstain: 0 }; votes.forEach((v) => cnt[v.vote]++);
+    const VL = { yes: '👍 Sì', no: '👎 No', abstain: '🤷 Astenuto' };
+    const rev = app.reviewed_by ? `<div class="muted small" style="margin-top:10px">Valutata da <b>${esc(name(app.reviewed_by))}</b> il ${esc(ELY.fmt(app.reviewed_at))}</div>` : '';
+    ELY.setMain(`<div class="screen">
+      <a class="back" href="${esc(ELY.url('staff/'))}">← Tutte le candidature</a>
+      <div class="row-flex" style="margin-bottom:18px"><h1 class="page-title" style="margin:0">${esc(ELY.roleName(app.role))}</h1>${ELY.statusBadge(app.status)}</div>
+      <div class="two-col">
+        <div>
+          <div class="panel"><h2>Risposte</h2><div class="qa">${(Array.isArray(app.answers) ? app.answers : []).map((x) => `<div class="q"><h4>${esc(x.q)}</h4><p>${esc(x.a)}</p></div>`).join('') || '<div class="empty">Nessuna risposta.</div>'}</div></div>
+        </div>
+        <div class="side">
+          <div class="panel"><h3>Candidato</h3>
+            <div class="row-flex" style="margin-bottom:12px">${ELY.avatar(cand.avatar_url, cand.username, 'lg')}<div><b style="font-size:18px">${esc(cand.username || 'utente')}</b><div style="margin-top:4px">${ELY.roleBadge(cand.role || 'user')}</div></div></div>
+            <dl class="kv"><dt>Discord ID</dt><dd>${esc(cand.discord_id || '—')} <button class="ib" id="cp">Copia</button></dd>
+              <dt>Lingua</dt><dd>${app.lang === 'en' ? '🇬🇧 English' : '🇮🇹 Italiano'}</dd>
+              <dt>Inviata</dt><dd>${esc(ELY.fmt(app.created_at))}</dd>
+              <dt>Registrato</dt><dd>${esc(ELY.fmt(cand.created_at))}</dd></dl>
+            ${others.length ? `<h3 style="margin-top:16px">Altre candidature</h3><div class="vlist">${others.map((o) => `<div><a href="${esc(ELY.url('staff/application/?id=' + encodeURIComponent(o.id)))}">${esc(ELY.roleName(o.role))}</a> ${ELY.statusBadge(o.status)}</div>`).join('')}</div>` : ''}</div>
+          <div class="panel"><h3>Stato</h3>
+            <div class="statusbtns"><button class="btn small warn" data-st="pending">⏳ Attesa</button><button class="btn small ok" data-st="accepted">✅ Accetta</button><button class="btn small danger" data-st="rejected">❌ Rifiuta</button></div>${rev}</div>
+          <div class="panel"><h3>Voti dello staff</h3>
+            <div class="votebtns">${['yes', 'no', 'abstain'].map((v) => `<button class="btn small ${v === 'yes' ? 'ok' : v === 'no' ? 'danger' : 'ghost'} ${myVote === v ? 'sel' : ''}" data-v="${v}">${VL[v]}</button>`).join('')}</div>
+            <div class="muted small" style="margin-bottom:8px">Sì ${cnt.yes} · No ${cnt.no} · Astenuti ${cnt.abstain}${myVote ? ` · <a href="#" id="unvote">togli il mio voto</a>` : ''}</div>
+            <div class="vlist">${votes.map((v) => `<div>${ELY.avatar((profs[v.staff_id] || {}).avatar_url, name(v.staff_id), 'sm')}<span>${esc(name(v.staff_id))}</span><span class="spacer"></span><span>${VL[v.vote] || esc(v.vote)}</span></div>`).join('') || '<span class="muted">Nessun voto ancora.</span>'}</div></div>
+          <div class="panel"><h3>Note interne (solo staff)</h3>
+            <textarea id="nb" maxlength="2000" placeholder="Scrivi una nota…" style="min-height:80px"></textarea>
+            <div style="margin-top:8px"><button class="btn small" id="addn">Aggiungi nota</button></div>
+            <div id="notes">${notes.map((n) => `<div class="note"><div class="meta">${ELY.avatar((profs[n.author_id] || {}).avatar_url, name(n.author_id), 'sm')}<span>${esc(name(n.author_id))}</span><span>${esc(ELY.fmt(n.created_at))}</span>${(n.author_id === me || ELY.isAdmin()) ? `<button class="del" data-dn="${esc(n.id)}">Elimina</button>` : ''}</div><p>${esc(n.body)}</p></div>`).join('') || '<div class="muted small" style="margin-top:10px">Nessuna nota.</div>'}</div></div>
+        </div>
+      </div></div>`);
+
+    document.getElementById('cp').onclick = () => ELY.copy(cand.discord_id || '');
+    ELY.$$('[data-st]').forEach((b) => { b.onclick = async () => {
+      const st = b.dataset.st; if (st === app.status) return;
+      if (!(await ELY.confirm(`Segnare questa candidatura come "${ELY.STATUS[st].label}"?`, 'Conferma'))) return;
+      const { data, error } = await sb.rpc('set_application_status', { p_id: id, p_status: st });
+      if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+      app = Object.assign(app, Array.isArray(data) ? data[0] : data); ELY.toast('Stato aggiornato', 'ok'); draw();
+    }; });
+    ELY.$$('[data-v]').forEach((b) => { b.onclick = async () => {
+      const { error } = await sb.from('application_votes').upsert({ application_id: id, staff_id: me, vote: b.dataset.v, updated_at: new Date().toISOString() }, { onConflict: 'application_id,staff_id' });
+      if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+      await reloadSide(); ELY.toast('Voto registrato', 'ok');
+    }; });
+    const uv = document.getElementById('unvote');
+    if (uv) uv.onclick = async (e) => { e.preventDefault(); const { error } = await sb.from('application_votes').delete().eq('application_id', id).eq('staff_id', me); if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; } await reloadSide(); };
+    document.getElementById('addn').onclick = async () => {
+      const body = document.getElementById('nb').value.trim(); if (!body) return;
+      const { error } = await sb.from('application_notes').insert({ application_id: id, author_id: me, body });
+      if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+      await reloadSide(); ELY.toast('Nota aggiunta', 'ok');
+    };
+    ELY.$$('[data-dn]').forEach((b) => { b.onclick = async () => {
+      if (!(await ELY.confirm('Eliminare questa nota?', 'Elimina'))) return;
+      const { error } = await sb.from('application_notes').delete().eq('id', b.dataset.dn);
+      if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+      await reloadSide();
+    }; });
+  }
+  async function reloadSide() { if (await load()) draw(); }
+
+  if (await load()) draw();
+})();
+</script>
+</body>
+</html>
