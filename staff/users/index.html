@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Utenti | Area staff | Elysian Tierlist</title>
+<meta name="theme-color" content="#1a0b3a">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../../logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="nav"></div>
+<main class="wrap wide" id="app"><div class="loading">Caricamento…</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../../site-config.js"></script>
+<script src="../../config.js"></script>
+<script src="../../assets/forms-default.js"></script>
+<script src="../../assets/app.js"></script>
+<script>
+(async function () {
+  if (!(await ELY.init({ nav: 'staff', require: 'staff' }))) return;
+  const esc = ELY.esc, sb = ELY.sb, me = ELY.user.id, admin = ELY.isAdmin();
+  let users = [], counts = {}, invites = [];
+  const F = { q: '', role: '' };
+
+  async function load() {
+    const req = [sb.from('profiles').select('*').order('created_at', { ascending: false }), sb.from('applications').select('user_id,status')];
+    if (admin) req.push(sb.from('staff_invites').select('*').order('created_at', { ascending: false }));
+    const r = await Promise.all(req);
+    const err = r.map((x) => x.error).find(Boolean);
+    if (err) { ELY.panelMsg('Errore', 'Non riesco a caricare i dati: ' + esc(err.message)); return false; }
+    users = r[0].data || []; counts = {};
+    (r[1].data || []).forEach((a) => { const c = (counts[a.user_id] = counts[a.user_id] || { n: 0, ok: 0 }); c.n++; if (a.status === 'accepted') c.ok++; });
+    invites = admin ? (r[2].data || []) : [];
+    return true;
+  }
+
+  function shell() {
+    ELY.setMain(`<div class="screen">
+      <h1 class="page-title">Utenti registrati</h1><p class="page-sub">${admin ? 'Come Admin puoi cambiare i ruoli e invitare nuovo staff.' : 'Elenco di chi si è registrato con Discord.'}</p>
+      ${ELY.subnav('users')}
+      <div class="panel"><div class="toolbar">
+        <input type="search" id="q" placeholder="Cerca per nome o ID Discord…">
+        <select id="role"><option value="">Tutti i ruoli</option><option value="admin">Admin</option><option value="staff">Staff</option><option value="user">Utenti</option></select>
+        <button class="btn ghost small" id="reload">Aggiorna</button></div>
+        <div class="list users" id="list"></div></div>
+      ${admin ? `<div class="panel"><h2>Inviti staff</h2>
+        <p class="muted small" style="margin-bottom:12px">Inserisci l'ID Discord di una persona che non si è ancora registrata: appena farà il primo login avrà il ruolo scelto.</p>
+        <div class="toolbar"><input type="text" id="inv-id" placeholder="ID Discord (solo numeri)" inputmode="numeric" maxlength="25">
+          <select id="inv-role"><option value="staff">Staff</option><option value="admin">Admin</option></select><button class="btn small" id="inv-add">Invita</button></div>
+        <div class="list" id="invs"></div></div>` : ''}</div>`);
+    ['q', 'role'].forEach((k) => { const el = document.getElementById(k); el.oninput = el.onchange = () => { F[k] = el.value; render(); }; });
+    document.getElementById('reload').onclick = async () => { if (await load()) { render(); ELY.toast('Aggiornato', 'ok'); } };
+    if (admin) document.getElementById('inv-add').onclick = addInvite;
+  }
+
+  function render() {
+    const q = F.q.trim().toLowerCase();
+    const rows = users.filter((u) => (!F.role || u.role === F.role) && (!q || `${u.username || ''} ${u.discord_id || ''}`.toLowerCase().includes(q)));
+    const head = `<div class="item head"><span>Utente</span><span>Discord ID</span><span>Ruolo</span><span>Registrato</span><span>Candidature</span></div>`;
+    document.getElementById('list').innerHTML = rows.length ? head + rows.map((u) => {
+      const c = counts[u.id] || { n: 0, ok: 0 }, self = u.id === me;
+      const roleCell = admin && !self
+        ? `<span class="row-flex" style="gap:6px"><select data-rs="${esc(u.id)}" style="padding:6px 8px"><option value="user"${u.role === 'user' ? ' selected' : ''}>Utente</option><option value="staff"${u.role === 'staff' ? ' selected' : ''}>Staff</option><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option></select><button class="btn small" data-rb="${esc(u.id)}" hidden>Salva</button></span>`
+        : `${ELY.roleBadge(u.role)}${self ? ' <small class="muted">(tu)</small>' : ''}`;
+      return `<div class="item"><div class="who">${ELY.avatar(u.avatar_url, u.username, 'sm')}<div><b>${esc(u.username || 'utente')}</b></div></div>
+        <span class="small">${esc(u.discord_id || '—')}</span><span>${roleCell}</span><span class="muted small">${esc(ELY.fmt(u.created_at))}</span>
+        <span class="small">${c.n} inviate · ${c.ok} accettate</span></div>`;
+    }).join('') : `<div class="empty">Nessun utente trovato.</div>`;
+    ELY.$$('[data-rs]').forEach((s) => {
+      const u = users.find((x) => x.id === s.dataset.rs), btn = document.querySelector(`[data-rb="${s.dataset.rs}"]`);
+      s.onchange = () => { btn.hidden = s.value === u.role; };
+      btn.onclick = async () => {
+        if (!(await ELY.confirm(`Cambiare il ruolo di ${u.username || 'questo utente'} in "${ELY.ROLE_LABEL[s.value]}"?`, 'Cambia ruolo'))) return;
+        const { error } = await sb.rpc('set_user_role', { p_user: u.id, p_role: s.value });
+        if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+        u.role = s.value; ELY.toast('Ruolo aggiornato', 'ok'); render();
+      };
+    });
+    if (admin) document.getElementById('invs').innerHTML = invites.length ? invites.map((i) =>
+      `<div class="item" style="grid-template-columns:1fr 120px 120px"><span>${esc(i.discord_id)}</span><span>${ELY.roleBadge(i.role)}</span><button class="btn small danger" data-di="${esc(i.discord_id)}">Annulla</button></div>`).join('')
+      : `<div class="empty">Nessun invito in sospeso.</div>`;
+    ELY.$$('[data-di]').forEach((b) => { b.onclick = async () => {
+      const { error } = await sb.from('staff_invites').delete().eq('discord_id', b.dataset.di);
+      if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+      invites = invites.filter((i) => i.discord_id !== b.dataset.di); render();
+    }; });
+  }
+
+  async function addInvite() {
+    const did = document.getElementById('inv-id').value.trim(), role = document.getElementById('inv-role').value;
+    if (!/^\d{15,25}$/.test(did)) { ELY.toast('ID Discord non valido (solo numeri, 15-25 cifre).', 'err'); return; }
+    const exists = users.find((u) => u.discord_id === did);
+    if (exists) { ELY.toast(`${exists.username || 'Questa persona'} è già registrata: cambia il suo ruolo dall'elenco.`, 'err'); return; }
+    const { error } = await sb.from('staff_invites').upsert({ discord_id: did, role, created_by: me }, { onConflict: 'discord_id' });
+    if (error) { ELY.toast('Errore: ' + error.message, 'err'); return; }
+    document.getElementById('inv-id').value = ''; await load(); render(); ELY.toast('Invito creato', 'ok');
+  }
+
+  if (!(await load())) return;
+  shell(); render();
+})();
+</script>
+</body>
+</html>
