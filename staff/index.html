@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Area staff | Elysian Tierlist</title>
+<meta name="theme-color" content="#1a0b3a">
+<meta name="robots" content="noindex">
+<link rel="icon" href="../logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="nav"></div>
+<main class="wrap wide" id="app"><div class="loading">Caricamento…</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../site-config.js"></script>
+<script src="../config.js"></script>
+<script src="../assets/forms-default.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+(async function () {
+  if (!(await ELY.init({ nav: 'staff', require: 'staff' }))) return;
+  const esc = ELY.esc, sb = ELY.sb;
+  const forms = await ELY.loadForms();
+  let apps = [], profs = {}, tally = {}, notesN = {};
+  const F = { q: '', role: '', status: '', sort: 'pending' };
+
+  async function load() {
+    const [a, p, v, n] = await Promise.all([
+      sb.from('applications').select('*').order('created_at', { ascending: false }).limit(2000),
+      sb.from('profiles').select('*'),
+      sb.from('application_votes').select('application_id,vote'),
+      sb.from('application_notes').select('application_id')
+    ]);
+    const err = a.error || p.error || v.error || n.error;
+    if (err) { ELY.panelMsg('Errore', 'Non riesco a caricare i dati: ' + esc(err.message)); return false; }
+    apps = a.data || []; profs = {}; (p.data || []).forEach((x) => { profs[x.id] = x; });
+    tally = {}; (v.data || []).forEach((x) => { const t = (tally[x.application_id] = tally[x.application_id] || { yes: 0, no: 0, abstain: 0 }); t[x.vote]++; });
+    notesN = {}; (n.data || []).forEach((x) => { notesN[x.application_id] = (notesN[x.application_id] || 0) + 1; });
+    return true;
+  }
+  const ign = (a) => ((Array.isArray(a.answers) ? a.answers : []).find((x) => x.id === 'ign') || {}).a || '';
+
+  function shell() {
+    const opts = forms.all.map((r) => `<option value="${esc(r.id)}">${esc((r.it && r.it.n) || r.id)}</option>`).join('');
+    ELY.setMain(`<div class="screen">
+      <h1 class="page-title">Area staff</h1><p class="page-sub">Ciao ${esc(ELY.profile.username)} · ${esc(ELY.ROLE_LABEL[ELY.profile.role])}</p>
+      ${ELY.subnav('apps')}
+      <div class="stats" id="stats"></div>
+      <div class="panel">
+        <div class="toolbar">
+          <input type="search" id="q" placeholder="Cerca per nome Discord, ID o IGN…">
+          <select id="role"><option value="">Tutti i ruoli</option>${opts}</select>
+          <select id="status"><option value="">Tutti gli stati</option><option value="pending">In attesa</option><option value="accepted">Accettate</option><option value="rejected">Rifiutate</option></select>
+          <select id="sort"><option value="pending">In attesa prima</option><option value="recent">Più recenti</option><option value="old">Più vecchie</option></select>
+          <button class="btn ghost small" id="reload">Aggiorna</button>
+        </div>
+        <div class="list" id="list"></div>
+      </div></div>`);
+    ['q', 'role', 'status', 'sort'].forEach((k) => { const el = document.getElementById(k); el.oninput = el.onchange = () => { F[k] = el.value; render(); }; });
+    document.getElementById('reload').onclick = async () => { if (await load()) render(); ELY.toast('Aggiornato', 'ok'); };
+  }
+
+  function render() {
+    const c = { all: apps.length, pending: 0, accepted: 0, rejected: 0 }; apps.forEach((a) => c[a.status]++);
+    document.getElementById('stats').innerHTML =
+      `<div class="stat all"><b>${c.all}</b><span>Totali</span></div><div class="stat pending"><b>${c.pending}</b><span>In attesa</span></div>
+       <div class="stat accepted"><b>${c.accepted}</b><span>Accettate</span></div><div class="stat rejected"><b>${c.rejected}</b><span>Rifiutate</span></div>
+       <div class="stat"><b>${Object.keys(profs).length}</b><span>Utenti registrati</span></div>`;
+    const q = F.q.trim().toLowerCase();
+    let rows = apps.filter((a) => {
+      if (F.role && a.role !== F.role) return false;
+      if (F.status && a.status !== F.status) return false;
+      if (q) { const p = profs[a.user_id] || {}; const hay = `${p.username || ''} ${p.discord_id || ''} ${ign(a)}`.toLowerCase(); if (!hay.includes(q)) return false; }
+      return true;
+    });
+    const t = (a) => new Date(a.created_at).getTime();
+    if (F.sort === 'old') rows.sort((a, b) => t(a) - t(b));
+    else if (F.sort === 'pending') rows.sort((a, b) => ((a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1)) || (t(b) - t(a)));
+    else rows.sort((a, b) => t(b) - t(a));
+    const head = `<div class="item head"><span>Candidato</span><span>Ruolo · IGN</span><span>Data</span><span>Stato</span><span>Voti · Note</span></div>`;
+    document.getElementById('list').innerHTML = rows.length ? head + rows.map((a) => {
+      const p = profs[a.user_id] || {}, v = tally[a.id] || { yes: 0, no: 0 };
+      return `<a class="item" href="${esc(ELY.url('staff/application/?id=' + encodeURIComponent(a.id)))}">
+        <div class="who">${ELY.avatar(p.avatar_url, p.username, 'sm')}<div><b>${esc(p.username || 'utente')}</b><small>${esc(p.discord_id || '')}</small></div></div>
+        <div><span class="badge role">${esc(ELY.roleName(a.role))}</span> <small class="muted">${esc(ign(a))}</small></div>
+        <span class="muted small">${esc(ELY.fmt(a.created_at))}</span><span>${ELY.statusBadge(a.status)}</span>
+        <span class="votes">👍 ${v.yes} · 👎 ${v.no} · 💬 ${notesN[a.id] || 0}</span></a>`;
+    }).join('') : `<div class="empty">Nessuna candidatura trovata.</div>`;
+  }
+
+  if (!(await load())) return;
+  shell(); render();
+})();
+</script>
+</body>
+</html>
