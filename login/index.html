@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accedi | Elysian Tierlist</title>
+<meta name="theme-color" content="#1a0b3a">
+<link rel="icon" href="../logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="nav"></div>
+<main class="wrap" id="app"><div class="loading">Accesso in corso…</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../site-config.js"></script>
+<script src="../config.js"></script>
+<script src="../assets/forms-default.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+(async function () {
+  await ELY.init({ nav: '' });
+  const esc = ELY.esc;
+  const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const err = q.get('error_description') || h.get('error_description') || q.get('error') || '';
+
+  // già loggato (o appena tornato da Discord): vai alla pagina da cui eri partito
+  if (ELY.user && ELY.profile) {
+    let next = ''; try { next = sessionStorage.getItem('ely_next') || ''; sessionStorage.removeItem('ely_next'); } catch (_) { }
+    location.replace(next && next.indexOf(ELY.ROOT) === 0 && !/\/login\/?(\?|#|$)/.test(next) ? next : ELY.url(''));
+    return;
+  }
+  const notReady = !ELY.configured
+    ? `<div class="msg err" style="display:block;margin-bottom:16px">Il sito non è ancora collegato al database: compila <b>site-config.js</b> (vedi GUIDA-STAFF.md).</div>` : '';
+  const problem = ELY.user && !ELY.profile
+    ? `<div class="msg err" style="display:block;margin-bottom:16px">Login riuscito ma il tuo profilo non esiste: il database non è configurato (esegui schema.sql, vedi la guida).</div>` : '';
+  ELY.setMain(`<div class="panel center screen" style="max-width:520px;margin:30px auto">
+      <h2>Accedi con Discord</h2>
+      <p class="muted" style="margin-bottom:18px">Per candidarti e seguire lo stato serve un account Discord. Il login non ci dà accesso ai tuoi messaggi né ai tuoi server: leggiamo solo nome, ID e immagine profilo.</p>
+      ${err ? `<div class="msg err" style="display:block;margin-bottom:16px">Accesso non riuscito: ${esc(err)}</div>` : ''}${notReady}${problem}
+      <button class="btn discord" id="go">Accedi con Discord</button>
+    </div>`);
+  document.getElementById('go').onclick = () => ELY.login();
+})();
+</script>
+</body>
+</html>
